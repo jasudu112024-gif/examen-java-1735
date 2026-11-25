@@ -39,9 +39,10 @@ import java.sql.SQLException;
 import java.util.List;
 
 public class InventarioServicio {
-    // Visto en clase: constantes final / static final -> Ticket (final IVA, Sesión 01) y S12Demo04 ConfiguracionSistema (Sesión 12)
-    // Visto en clase: encapsulamiento: private + getters + validación -> S06Demo00Billetera y S06Demo01PerfilUsuario (Sesión 06)
-    // Visto en clase: PATRÓN DAO (interfaz + implementación) -> S18Demo01 UsuarioDAO (Sesión 18)
+
+    public static final Object CERROJO_STOCK = new Object();
+
+
     private final RepuestoDAO repuestoDAO;
     private final TipoRepuestoDAO tipoDAO;
     private final LoteDAO loteDAO;
@@ -169,29 +170,36 @@ public class InventarioServicio {
     }
 
     /**
-     * REGLA CRÍTICA (1/2): al asignar un repuesto a una orden, las unidades
+     * al asignar un repuesto a una orden, las unidades
      * pasan a "Reservado": el stock físico no cambia, pero ya no están disponibles.
      */
     public void reservar(int repuestoId, int cantidad) throws SQLException {
-        verificarDisponibilidad(repuestoId, cantidad);
-        Repuesto actual = obtenerRepuesto(repuestoId);
-        repuestoDAO.actualizarCantidades(repuestoId, actual.getCantidadStock(),
-                actual.getCantidadReservada() + cantidad);
-        avisarSiBajoMinimo(repuestoId);
+        // SECCIÓN CRÍTICA: leer -> validar -> escribir. Sin el candado, dos hilos podrían leer
+        // "disponible 1" a la vez y ambos escribir la reserva (condición de carrera).
+        synchronized (CERROJO_STOCK) {
+            verificarDisponibilidad(repuestoId, cantidad);
+            Repuesto actual = obtenerRepuesto(repuestoId);
+            repuestoDAO.actualizarCantidades(repuestoId, actual.getCantidadStock(),
+                    actual.getCantidadReservada() + cantidad);
+            avisarSiBajoMinimo(repuestoId);
+        }
     }
 
     /**
-     * REGLA CRÍTICA (2/2): al completar la orden, las unidades reservadas se
+     *  al completar la orden, las unidades reservadas se
      * descuentan PERMANENTEMENTE del stock físico y se liberan de la reserva.
      */
     public void deducirReservado(int repuestoId, int cantidad) throws SQLException {
-        Repuesto actual = obtenerRepuesto(repuestoId);
-        if (cantidad <= 0 || cantidad > actual.getCantidadReservada()) {
-            throw new ReglaNegocioException("No hay " + cantidad + " unidades reservadas de " + actual.getNombre() + ".");
+        // Mismo candado que reservar: también lee y escribe las cantidades del mismo repuesto.
+        synchronized (CERROJO_STOCK) {
+            Repuesto actual = obtenerRepuesto(repuestoId);
+            if (cantidad <= 0 || cantidad > actual.getCantidadReservada()) {
+                throw new ReglaNegocioException("No hay " + cantidad + " unidades reservadas de " + actual.getNombre() + ".");
+            }
+            repuestoDAO.actualizarCantidades(repuestoId, actual.getCantidadStock() - cantidad,
+                    actual.getCantidadReservada() - cantidad);
+            avisarSiBajoMinimo(repuestoId);
         }
-        repuestoDAO.actualizarCantidades(repuestoId, actual.getCantidadStock() - cantidad,
-                actual.getCantidadReservada() - cantidad);
-        avisarSiBajoMinimo(repuestoId);
     }
 
     // Observer: publica la alerta si, tras el movimiento, quedó por debajo del mínimo.
@@ -284,10 +292,13 @@ public class InventarioServicio {
 
     /** Devuelve unidades reservadas al disponible (se quitó el repuesto de una orden). */
     public void liberarReserva(int repuestoId, int cantidad) throws SQLException {
-        Repuesto actual = obtenerRepuesto(repuestoId);
-        if (cantidad <= 0 || cantidad > actual.getCantidadReservada()) {
-            throw new ReglaNegocioException("No hay " + cantidad + " unidades reservadas de " + actual.getNombre() + ".");
+        // Mismo candado que reservar: evita que una liberación y una reserva se pisen al escribir.
+        synchronized (CERROJO_STOCK) {
+            Repuesto actual = obtenerRepuesto(repuestoId);
+            if (cantidad <= 0 || cantidad > actual.getCantidadReservada()) {
+                throw new ReglaNegocioException("No hay " + cantidad + " unidades reservadas de " + actual.getNombre() + ".");
+            }
+            repuestoDAO.actualizarCantidades(repuestoId, actual.getCantidadStock(), actual.getCantidadReservada() - cantidad);
         }
-        repuestoDAO.actualizarCantidades(repuestoId, actual.getCantidadStock(), actual.getCantidadReservada() - cantidad);
     }
 }

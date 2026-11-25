@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Sistema de Gestión para el Taller Automotriz CarMotors
 
 Sistema de Gestión de Taller (SGT) por consola, desarrollado en **Java 17 + MySQL (JDBC)** por el Grupo 02.
@@ -278,3 +279,6 @@ El archivo `.gitignore` excluye la carpeta de compilación (`target/`), los `*.c
 - Exneider Nava
 - Andrés Rueda
 - *(completar: integrante con usuario de GitHub `felizin_tk`)*
+=======
+# examen-java-1735
+>>>>>>> edb8cbbe1bd992e4e9163b825426149a046bf871

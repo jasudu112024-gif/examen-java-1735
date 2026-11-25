@@ -188,16 +188,19 @@ public class OrdenServicioServicio {
         if (yaAsignado) {
             throw new ReglaNegocioException("Ese repuesto ya está en la orden.");
         }
-        inventario.verificarDisponibilidad(repuestoId, cantidad);  // 1) validar antes de escribir
-        Repuesto repuesto = inventario.obtenerRepuesto(repuestoId);
-        detalleDAO.insertar(new DetalleRepuesto(servicioId, repuestoId, repuesto.getNombre(), cantidad,
-                repuesto.getPrecioVenta(), EstadoReserva.RESERVADO));                  // 2) detalle
-        inventario.reservar(repuestoId, cantidad);                                     // 3) "Reservado"
+
+        synchronized (InventarioServicio.CERROJO_STOCK) {
+            inventario.verificarDisponibilidad(repuestoId, cantidad);  // 1) validar antes de escribir
+            Repuesto repuesto = inventario.obtenerRepuesto(repuestoId);
+            detalleDAO.insertar(new DetalleRepuesto(servicioId, repuestoId, repuesto.getNombre(), cantidad,
+                    repuesto.getPrecioVenta(), EstadoReserva.RESERVADO));                  // 2) detalle
+            inventario.reservar(repuestoId, cantidad);                                     // 3) "Reservado"
+        }
     }
 
     // ------------------------------------------------------------ Ciclo de vida (State)
 
-    /** Pendiente -> En Proceso. Requiere al menos un técnico asignado. */
+
     public void iniciar(int servicioId) throws SQLException {
         OrdenServicio orden = obtenerOrden(servicioId);
         validarTransicion(orden, EstadoServicio.EN_PROCESO);

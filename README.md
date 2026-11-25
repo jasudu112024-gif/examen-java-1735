@@ -1,3 +1,47 @@
+### Examen final 1735 | Reserva concurrente de repuestos
+Estudiante y grupo: Javier Alfonso Suarez Duarte | Grupo 02
+Proyecto de origen: https://github.com/duvancovilla292-prog/proyecto-java-grupo02
+Acceso: clase principal `com.carmotors.simulacion.MainReservaConcurrente` (se ejecuta con su propio `main`, aparte del menú del taller)
+Clases del examen:
+- `src/main/java/com/carmotors/simulacion/MainReservaConcurrente.java` (clase nueva)
+- `src/main/java/com/carmotors/servicio/OrdenServicioServicio.java` (ajustada: `asignarRepuesto`)
+- `src/main/java/com/carmotors/servicio/InventarioServicio.java` (ajustada: candado `CERROJO_STOCK` y los métodos `reservar`, `deducirReservado` y `liberarReserva`)
+```
+## ¿Cuál era el problema?
+
+Dos técnicos pedían el último repuesto del almacén casi al mismo tiempo. El sistema hacía tres pasos:
+
+1. Ver cuántas unidades había.
+2. Revisar que alcanzaran.
+3. Guardar la reserva.
+
+Si los dos técnicos hacían el paso 1 antes de que alguno llegara al paso 3, los dos veían "hay 1 disponible" y los dos reservaban. Pero solo existía una pieza. A esto se le llama **condición de carrera**.
+
+## ¿Cómo lo solucioné?
+
+Hice que esos tres pasos los pueda ejecutar **un solo técnico a la vez**, usando `synchronized` de Java. Mientras un técnico está reservando, el otro espera. Cuando el primero termina, el segundo mira el stock, ve que ya no hay y recibe el mensaje de que no hay suficiente.
+
+## ¿Qué cambié?
+
+| Archivo                                  | Qué hice                                                     |
+| ---------------------------------------- | ------------------------------------------------------------ |
+| `servicio/InventarioServicio.java`       | Agregué un candado `CERROJO_STOCK`. Los métodos `reservar`, `deducirReservado` y `liberarReserva` ahora usan ese candado. |
+| `servicio/OrdenServicioServicio.java`    | En `asignarRepuesto`, los tres pasos (verificar, guardar el detalle y reservar) quedaron dentro del candado. |
+| `simulacion/MainReservaConcurrente.java` | Archivo nuevo. Es una clase aparte, con su propio `main`, que demuestra que la solución funciona. |
+
+El candado es `static` para que lo compartan todos los servicios. Si no lo fuera, cada técnico tendría su propio candado y no se esperarían entre sí.
+
+## ¿Qué hace la simulación?
+
+`MainReservaConcurrente` no forma parte del menú del taller. Al ejecutarla:
+
+1. Deja el repuesto "Filtro de Aceite XY-123" con exactamente 1 unidad en stock.
+2. Crea una orden de servicio para cada técnico.
+3. Lanza dos hilos al mismo tiempo, `Hilo-Técnico-A` e `Hilo-Técnico-B`. Cada uno intenta reservar esa única unidad con la misma operación que usa la aplicación (`asignarRepuesto`).
+4. Muestra quién reservó, a quién se le rechazó y cuánto queda disponible.
+
+
+
 <<<<<<< HEAD
 # Sistema de Gestión para el Taller Automotriz CarMotors
 
